@@ -3,6 +3,8 @@ import '../models/scan_model.dart';
 import '../services/scan_service.dart';
 import '../services/local_storage_service.dart';
 import '../utils/app_constants.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/map_service.dart';
 
 enum ScanState { idle, loading, success, error }
 
@@ -34,8 +36,7 @@ class ScanProvider extends ChangeNotifier {
 
     try {
       if (!isOnline) {
-        // Save locally, mark as unsynced
-        _errorMessage = 'No internet. Scan saved — will sync when online.';
+        _errorMessage = 'No internet. Connect to scan.';
         _state = ScanState.error;
         notifyListeners();
         return;
@@ -51,13 +52,25 @@ class ScanProvider extends ChangeNotifier {
 
       _currentScan = scan;
 
-      // Cache locally
+      // Save to local cache
       LocalStorageService.save(AppConstants.scansBox, scan.id, scan.toMap());
+
+      // Save to Firestore
+      await FirebaseFirestore.instance
+          .collection('scans')
+          .doc(scan.id)
+          .set(scan.copyWith(isSynced: true).toMap());
+
+      // Update district stats
+      await MapService().updateDistrictCount(
+        district: district,
+        diseaseName: scan.diseaseName,
+      );
 
       _scanHistory.insert(0, scan);
       _state = ScanState.success;
     } catch (e) {
-      _errorMessage = 'Scan failed: ${e.toString()}';
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
       _state = ScanState.error;
     }
 
