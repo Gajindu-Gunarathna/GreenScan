@@ -49,19 +49,16 @@ class _CameraScreenState extends State<CameraScreen> {
         maxHeight: 1024,
       );
 
+      // User cancelled — just return silently, no error
       if (image == null) return;
 
       setState(() => _isProcessing = true);
 
-      // Get location in parallel
       final position = await _getLocation();
 
-      // Check connectivity
       final connectivity = context.read<ConnectivityService>();
       final isOnline = await connectivity.isOnline();
 
-      // Get user district from local storage (set during registration)
-      // For now use a placeholder — auth teammate will provide currentUser
       const String userId = 'temp_user_id';
       const String district = 'Colombo';
 
@@ -76,9 +73,8 @@ class _CameraScreenState extends State<CameraScreen> {
         isOnline: isOnline,
       );
 
-      setState(() => _isProcessing = false);
-
       if (!mounted) return;
+      setState(() => _isProcessing = false);
 
       final scanProvider = context.read<ScanProvider>();
 
@@ -88,18 +84,35 @@ class _CameraScreenState extends State<CameraScreen> {
           MaterialPageRoute(builder: (_) => const ResultScreen()),
         );
       } else {
-        _showError(scanProvider.errorMessage);
+        // Show error but don't crash
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                scanProvider.errorMessage.isNotEmpty
+                    ? scanProvider.errorMessage
+                    : 'Scan failed. Please try again.',
+              ),
+              backgroundColor: AppColors.warning,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
       }
-    } catch (e) {
+    } on Exception catch (e) {
+      if (!mounted) return;
       setState(() => _isProcessing = false);
-      _showError('Something went wrong. Please try again.');
+      // Only show error if it's not a cancellation
+      final errorStr = e.toString().toLowerCase();
+      if (!errorStr.contains('cancel') && !errorStr.contains('pick')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
-  }
-
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppColors.error),
-    );
   }
 
   @override
@@ -144,18 +157,13 @@ class _CameraScreenState extends State<CameraScreen> {
   Widget _buildCameraView() {
     return Stack(
       children: [
-        // Dark background
         Container(color: Colors.black87),
-
-        // Scan overlay — the bracket corners from your Figma
         Center(
           child: CustomPaint(
             size: const Size(280, 280),
             painter: _ScanFramePainter(),
           ),
         ),
-
-        // Instructions
         Positioned(
           bottom: 160,
           left: 0,
@@ -179,8 +187,6 @@ class _CameraScreenState extends State<CameraScreen> {
             ],
           ),
         ),
-
-        // Bottom controls
         Positioned(
           bottom: 40,
           left: 0,
@@ -188,7 +194,6 @@ class _CameraScreenState extends State<CameraScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              // Gallery button
               GestureDetector(
                 onTap: () => _captureAndScan(ImageSource.gallery),
                 child: Container(
@@ -205,8 +210,6 @@ class _CameraScreenState extends State<CameraScreen> {
                   ),
                 ),
               ),
-
-              // Main capture button
               GestureDetector(
                 onTap: () => _captureAndScan(ImageSource.camera),
                 child: Container(
@@ -223,8 +226,6 @@ class _CameraScreenState extends State<CameraScreen> {
                   ),
                 ),
               ),
-
-              // Rotate/flip placeholder
               Container(
                 width: 52,
                 height: 52,
@@ -246,7 +247,6 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 }
 
-// Draws the 4-corner bracket frame like your Figma design
 class _ScanFramePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -259,11 +259,9 @@ class _ScanFramePainter extends CustomPainter {
     const double cornerLength = 40;
     const double radius = 8;
 
-    // Top-left corner
     canvas.drawLine(Offset(0, cornerLength), Offset(0, radius), paint);
     canvas.drawLine(Offset(radius, 0), Offset(cornerLength, 0), paint);
 
-    // Top-right corner
     canvas.drawLine(
       Offset(size.width - cornerLength, 0),
       Offset(size.width - radius, 0),
@@ -275,7 +273,6 @@ class _ScanFramePainter extends CustomPainter {
       paint,
     );
 
-    // Bottom-left corner
     canvas.drawLine(
       Offset(0, size.height - cornerLength),
       Offset(0, size.height - radius),
@@ -287,7 +284,6 @@ class _ScanFramePainter extends CustomPainter {
       paint,
     );
 
-    // Bottom-right corner
     canvas.drawLine(
       Offset(size.width - cornerLength, size.height),
       Offset(size.width - radius, size.height),
@@ -299,7 +295,6 @@ class _ScanFramePainter extends CustomPainter {
       paint,
     );
 
-    // Small center crosshair
     final centerPaint = Paint()
       ..color = Colors.white54
       ..strokeWidth = 1;
