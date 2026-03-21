@@ -59,7 +59,7 @@ class ResultScreen extends StatelessWidget {
               child: Image.network(
                 scan.imageUrl,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
+                errorBuilder: (_, _, _) => Container(
                   color: Colors.grey[200],
                   child: const Icon(Icons.image, size: 60, color: Colors.grey),
                 ),

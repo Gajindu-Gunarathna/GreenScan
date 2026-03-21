@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'providers/scan_provider.dart';
 import 'providers/map_provider.dart';
 import 'providers/plan_provider.dart';
@@ -12,6 +14,10 @@ import 'screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Firebase must initialize before anything else
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   await LocalStorageService.init();
   runApp(const GreenScanApp());
 }

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class NotificationProvider extends ChangeNotifier {
   int _unreadCount = 0;
-  List<Map<String, dynamic>> _notifications = [];
+  final List<Map<String, dynamic>> _notifications = [];
 
   int get unreadCount => _unreadCount;
   List<Map<String, dynamic>> get notifications => _notifications;

@@ -1,6 +1,6 @@
 class AppConstants {
   // Replace with your FastAPI server URL when ready
-  static const String aiBaseUrl = 'http://10.0.2.2:8000';
+  static const String aiBaseUrl = 'http://192.168.1.64:8000';
   static const String predictEndpoint = '/predict';
 
   // Claude API
