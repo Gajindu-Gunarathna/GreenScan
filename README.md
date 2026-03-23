@@ -1,7 +1,6 @@
-# greenscan
+# Greenscan - Daddy loves betel
 
-A new Flutter project.
-
+DogShit gajindu bot
 ## Getting Started
 
 This project is a starting point for a Flutter application.
