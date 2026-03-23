@@ -1,16 +1,50 @@
-# Greenscan - Daddy loves betel
+# GreenScan
 
-DogShit gajindu bot
-## Getting Started
+## Project Overview
+GreenScan is an innovative environmental monitoring tool designed to track, analyze, and visualize ecological data efficiently. It empowers users with actionable insights into environmental changes, contributing to informed decision-making.
 
-This project is a starting point for a Flutter application.
+## Features
+- Real-time environmental data tracking
+- Interactive data visualization tools
+- User-friendly interface
+- Comprehensive data reporting system
+- Multiplatform support
 
-A few resources to get you started if this is your first Flutter project:
+## Installation
+To install GreenScan, follow these steps:  
+1. Clone the repository:  
+   ```bash  
+   git clone https://github.com/Gajindu-Gunarathna/GreenScan.git  
+   ```  
+2. Navigate to the project directory:  
+   ```bash  
+   cd GreenScan  
+   ```  
+3. Install dependencies:  
+   ```bash  
+   npm install  
+   ```  
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Usage
+To start using GreenScan, run:  
+```bash  
+node index.js  
+```  
+Visit `http://localhost:3000` in your web browser to access the application.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Tech Stack
+- Node.js
+- Express.js
+- MongoDB
+- React
+
+## Contributing
+We welcome contributions to GreenScan! Please follow these steps:  
+1. Fork the repository  
+2. Create a new branch (`git checkout -b feature-branch`)  
+3. Make your changes  
+4. Commit your changes (`git commit -m 'Add new feature'`)  
+5. Push to the branch (`git push origin feature-branch`)  
+6. Open a pull request
+
+For any issues or feature requests, please open an issue in the repository. Thank you for considering contributing to GreenScan!
