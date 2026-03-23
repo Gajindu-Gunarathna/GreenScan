@@ -41,7 +41,7 @@ class HomeScreen extends StatelessWidget {
             const Icon(Icons.eco, size: 80, color: AppColors.primaryLight),
             const SizedBox(height: 24),
             const Text(
-              'Tap below to scan a betel leaf',
+              'Tap below to scan a betel leaves',
               style: TextStyle(fontSize: 18, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 32),
