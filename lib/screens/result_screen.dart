@@ -4,6 +4,7 @@ import '../providers/scan_provider.dart';
 import '../providers/plan_provider.dart';
 import '../utils/app_colors.dart';
 import 'treatment_screen.dart';
+import 'package:go_router/go_router.dart';
 
 class ResultScreen extends StatelessWidget {
   const ResultScreen({super.key});
@@ -175,13 +176,28 @@ class ResultScreen extends StatelessWidget {
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
-                            onPressed: () {
-                              context.read<PlanProvider>().loadTreatment(
-                                scan.diseaseName.toLowerCase().replaceAll(
-                                  ' ',
-                                  '_',
-                                ),
+                            onPressed: () async {
+                              //Define the cleaned ID using the robust RegExp logic
+                              final diseaseId = scan.diseaseName
+                                  .toLowerCase()
+                                  .replaceAll(RegExp(r'[^\w\s]'), '')
+                                  .trim()
+                                  .replaceAll(
+                                    RegExp(r'\s+'),
+                                    '_',
+                                  ); // spaces to underscores
+
+                              //Pass that ID to your provider
+                              // Wait for treatment to load BEFORE navigating
+                              await context.read<PlanProvider>().loadTreatment(
+                                diseaseId,
                               );
+
+                              if (!context.mounted) return;
+
+                              context.push('/treatment');
+
+                              //Navigates to TreatmentScans
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
