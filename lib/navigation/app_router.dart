@@ -15,6 +15,7 @@ import '../screens/support_screen.dart';
 import '../screens/result_screen.dart';
 import '../screens/treatment_screen.dart';
 import '../screens/hotlines_screen.dart';
+import '../screens/roadmap_screen.dart';
 
 GoRouter createRouter(BuildContext context) {
   return GoRouter(
@@ -36,27 +37,25 @@ GoRouter createRouter(BuildContext context) {
       return null;
     },
     routes: [
-      GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
-      GoRoute(
-        path: '/onboarding',
-        builder: (_, __) => const OnboardingScreen(),
-      ),
-      GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
-      GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
-      GoRoute(path: '/result', builder: (_, __) => const ResultScreen()),
-      GoRoute(path: '/treatment', builder: (_, __) => const TreatmentScreen()),
-      GoRoute(path: '/hotlines', builder: (_, __) => const HotlinesScreen()),
+      GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
+      GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingScreen()),
+      GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
+      GoRoute(path: '/register', builder: (_, _) => const RegisterScreen()),
+      GoRoute(path: '/result', builder: (_, _) => const ResultScreen()),
+      GoRoute(path: '/treatment', builder: (_, _) => const TreatmentScreen()),
+      GoRoute(path: '/hotlines', builder: (_, _) => const HotlinesScreen()),
+      GoRoute(path: '/roadmap', builder: (_, __) => const RoadmapScreen()),
       ShellRoute(
-        builder: (_, __, child) => MainShell(child: child),
+        builder: (_, _, child) => MainShell(child: child),
         routes: [
-          GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
+          GoRoute(path: '/home', builder: (_, _) => const HomeScreen()),
           GoRoute(
             path: '/community',
-            builder: (_, __) => const CommunityScreen(),
+            builder: (_, _) => const CommunityScreen(),
           ),
-          GoRoute(path: '/camera', builder: (_, __) => const CameraScreen()),
-          GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
-          GoRoute(path: '/support', builder: (_, __) => const SupportScreen()),
+          GoRoute(path: '/camera', builder: (_, _) => const CameraScreen()),
+          GoRoute(path: '/profile', builder: (_, _) => const ProfileScreen()),
+          GoRoute(path: '/support', builder: (_, _) => const SupportScreen()),
         ],
       ),
     ],

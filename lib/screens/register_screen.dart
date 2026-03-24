@@ -190,7 +190,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 14),
                   child: DropdownButtonFormField<String>(
-                    value: _selectedDistrict,
+                    initialValue: _selectedDistrict,
                     decoration: InputDecoration(
                       hintText: 'Select your District',
                       filled: true,

@@ -10,9 +10,9 @@ import 'providers/notification_provider.dart';
 import 'services/local_storage_service.dart';
 import 'services/connectivity_service.dart';
 import 'utils/app_colors.dart';
-import 'screens/home_screen.dart';
 import 'navigation/app_router.dart';
 import 'providers/auth_provider.dart';
+import 'providers/active_plan_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,6 +37,7 @@ class GreenScanApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ForumProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => ActivePlanProvider()),
         Provider(create: (_) => ConnectivityService()),
       ],
       child: MaterialApp.router(

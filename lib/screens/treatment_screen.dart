@@ -3,6 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/plan_provider.dart';
 import '../utils/app_colors.dart';
+import '../providers/scan_provider.dart';
+import '../providers/active_plan_provider.dart';
+import '../providers/auth_provider.dart';
+import 'package:go_router/go_router.dart';
 
 class TreatmentScreen extends StatelessWidget {
   const TreatmentScreen({super.key});
@@ -45,15 +49,127 @@ class TreatmentScreen extends StatelessWidget {
     );
   }
 
+  // --- REPLACED _buildContent METHOD ---
   Widget _buildContent(BuildContext context, PlanProvider plan) {
     final treatment = plan.currentTreatment!;
+
+    // 3. INITIALIZE PROVIDERS: Grab the instances needed for saving the plan
+    final scanProvider = context.read<ScanProvider>();
+    final activePlanProvider = context.read<ActivePlanProvider>();
+    final authProvider = context.read<AuthProvider>();
+    final currentScan = scanProvider.currentScan;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Short-term solutions
+          // 4. SAVE BUTTON LOGIC
+          // This block checks if a scan exists and if it's NOT already the active plan
+          if (currentScan != null &&
+              activePlanProvider.activePlan?.diseaseName !=
+                  currentScan.diseaseName)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 20),
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  final userId = authProvider.currentUser?.id ?? 'temp_user_id';
+
+                  // Logic to handle existing plans (Replace vs Keep)
+                  if (activePlanProvider.hasPlan) {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text('Replace existing plan?'),
+                        content: Text(
+                          'You already have an active plan for '
+                          '"${activePlanProvider.activePlan!.diseaseName}". '
+                          'Do you want to replace it with this new plan?',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Keep existing'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Replace'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm != true) return;
+                    await activePlanProvider.deletePlan(userId);
+                  }
+
+                  // Actually create the plan in the database/provider
+                  await activePlanProvider.createPlan(
+                    userId: userId,
+                    scan: currentScan,
+                    treatment: treatment,
+                  );
+
+                  if (!context.mounted) return;
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Treatment plan saved! Track it on your home screen.',
+                      ),
+                      backgroundColor: AppColors.success,
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.bookmark_add),
+                label: const Text(
+                  'Save as My Treatment Plan',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+
+          // 5. ROADMAP BUTTON
+          // Only shows if the user has ALREADY saved this specific disease plan
+          if (activePlanProvider.activePlan?.diseaseName ==
+              currentScan?.diseaseName)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 20),
+              child: OutlinedButton.icon(
+                onPressed: () => context.push('/roadmap'),
+                icon: const Icon(Icons.map_outlined, color: AppColors.primary),
+                label: const Text(
+                  'View My Treatment Roadmap',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  side: const BorderSide(color: AppColors.primary),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+
+          // 6. ORIGINAL CONTENT (Short term, Chemical, Long term)
           _sectionCard(
             icon: '🌿',
             iconColor: AppColors.success,
@@ -68,10 +184,7 @@ class TreatmentScreen extends StatelessWidget {
                   .toList(),
             ),
           ),
-
           const SizedBox(height: 20),
-
-          // Chemical treatments
           const Text(
             'Immediate Chemical Action',
             style: TextStyle(
@@ -97,10 +210,7 @@ class TreatmentScreen extends StatelessWidget {
                   .toList(),
             ),
           ),
-
           const SizedBox(height: 20),
-
-          // Long-term solutions
           _sectionCard(
             icon: '🌱',
             iconColor: AppColors.primaryLight,
@@ -113,10 +223,9 @@ class TreatmentScreen extends StatelessWidget {
                   .toList(),
             ),
           ),
-
           const SizedBox(height: 24),
 
-          // Feedback button
+          // Feedback button remains at the bottom
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
