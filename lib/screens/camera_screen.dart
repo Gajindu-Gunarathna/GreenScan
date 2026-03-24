@@ -6,6 +6,7 @@ import '../providers/scan_provider.dart';
 import '../services/connectivity_service.dart';
 import '../utils/app_colors.dart';
 import 'result_screen.dart';
+import '../providers/auth_provider.dart';
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -22,13 +23,11 @@ class _CameraScreenState extends State<CameraScreen> {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) return null;
-
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) return null;
       }
-
       return await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.medium,
@@ -49,18 +48,17 @@ class _CameraScreenState extends State<CameraScreen> {
         maxHeight: 1024,
       );
 
-      // User cancelled — just return silently, no error
       if (image == null) return;
 
       setState(() => _isProcessing = true);
 
       final position = await _getLocation();
-
       final connectivity = context.read<ConnectivityService>();
       final isOnline = await connectivity.isOnline();
 
-      const String userId = 'temp_user_id';
-      const String district = 'Colombo';
+      final authProvider = context.read<AuthProvider>();
+      final String userId = authProvider.currentUser?.id ?? 'anonymous';
+      final String district = authProvider.currentUser?.district ?? 'Unknown';
 
       if (!mounted) return;
 
@@ -84,7 +82,6 @@ class _CameraScreenState extends State<CameraScreen> {
           MaterialPageRoute(builder: (_) => const ResultScreen()),
         );
       } else {
-        // Show error but don't crash
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -102,7 +99,6 @@ class _CameraScreenState extends State<CameraScreen> {
     } on Exception catch (e) {
       if (!mounted) return;
       setState(() => _isProcessing = false);
-      // Only show error if it's not a cancellation
       final errorStr = e.toString().toLowerCase();
       if (!errorStr.contains('cancel') && !errorStr.contains('pick')) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -168,23 +164,18 @@ class _CameraScreenState extends State<CameraScreen> {
           bottom: 160,
           left: 0,
           right: 0,
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Text(
-                  'Position the leaf inside the frame',
-                  style: TextStyle(color: Colors.white, fontSize: 14),
-                ),
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(20),
               ),
-            ],
+              child: const Text(
+                'Position the leaf inside the frame',
+                style: TextStyle(color: Colors.white, fontSize: 14),
+              ),
+            ),
           ),
         ),
         Positioned(
@@ -261,7 +252,6 @@ class _ScanFramePainter extends CustomPainter {
 
     canvas.drawLine(Offset(0, cornerLength), Offset(0, radius), paint);
     canvas.drawLine(Offset(radius, 0), Offset(cornerLength, 0), paint);
-
     canvas.drawLine(
       Offset(size.width - cornerLength, 0),
       Offset(size.width - radius, 0),
@@ -272,7 +262,6 @@ class _ScanFramePainter extends CustomPainter {
       Offset(size.width, cornerLength),
       paint,
     );
-
     canvas.drawLine(
       Offset(0, size.height - cornerLength),
       Offset(0, size.height - radius),
@@ -283,7 +272,6 @@ class _ScanFramePainter extends CustomPainter {
       Offset(cornerLength, size.height),
       paint,
     );
-
     canvas.drawLine(
       Offset(size.width - cornerLength, size.height),
       Offset(size.width - radius, size.height),

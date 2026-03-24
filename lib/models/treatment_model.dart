@@ -49,7 +49,11 @@ class TreatmentModel {
       diseaseName: map['diseaseName'] ?? '',
       shortTermSteps: List<String>.from(map['shortTermSteps'] ?? []),
       chemicalTreatments: (map['chemicalTreatments'] as List? ?? [])
-          .map((e) => ChemicalTreatment.fromMap(e))
+          .map(
+            (e) => ChemicalTreatment.fromMap(
+              Map<String, dynamic>.from(e as Map), // ← this is the fix
+            ),
+          )
           .toList(),
       longTermSteps: List<String>.from(map['longTermSteps'] ?? []),
     );
