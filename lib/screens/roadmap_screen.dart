@@ -58,6 +58,57 @@ class RoadmapScreen extends StatelessWidget {
             _buildProgressCard(plan),
             const SizedBox(height: 24),
 
+            // Full treatment detail banner
+            Container(
+              margin: const EdgeInsets.only(bottom: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.07),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'Want full details, chemicals & where to buy?',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => context.push('/treatment'),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'View full plan',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
             // Short-term steps
             if (plan.shortTermSteps.isNotEmpty) ...[
               _sectionHeader(
@@ -167,7 +218,7 @@ class RoadmapScreen extends StatelessWidget {
       elevation: 0.5,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-        onPressed: () => Navigator.pop(context),
+        onPressed: () => context.pop(),
       ),
       title: const Text(
         'Treatment Roadmap',
@@ -438,25 +489,20 @@ class RoadmapScreen extends StatelessWidget {
         title: const Text('Delete Treatment Plan?'),
         content: Text(
           'This will delete your current plan for "${plan.diseaseName}". '
-          'Your progress will be lost. You can create a new plan after your next scan.',
+          'Your progress will be lost.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () =>
+                Navigator.pop(context), // dialog close — this is fine
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(context); // close dialog — this is fine
               await context.read<ActivePlanProvider>().deletePlan(userId);
               if (context.mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Treatment plan deleted.'),
-                    backgroundColor: AppColors.warning,
-                  ),
-                );
+                context.go('/home'); // ← use context.go not Navigator.pop
               }
             },
             style: ElevatedButton.styleFrom(

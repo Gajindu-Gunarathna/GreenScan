@@ -36,6 +36,7 @@ class PlanStep {
 class ActivePlanModel {
   final String id;
   final String userId;
+  final String diseaseId;
   final String diseaseName;
   final String scanImageUrl;
   final String severity;
@@ -46,6 +47,7 @@ class ActivePlanModel {
   ActivePlanModel({
     required this.id,
     required this.userId,
+    required this.diseaseId,
     required this.diseaseName,
     required this.scanImageUrl,
     required this.severity,
@@ -71,6 +73,7 @@ class ActivePlanModel {
   factory ActivePlanModel.fromMap(Map<String, dynamic> map) => ActivePlanModel(
     id: map['id'] ?? '',
     userId: map['userId'] ?? '',
+    diseaseId: map['diseaseId'] ?? '',
     diseaseName: map['diseaseName'] ?? '',
     scanImageUrl: map['scanImageUrl'] ?? '',
     severity: map['severity'] ?? 'medium',
@@ -86,6 +89,7 @@ class ActivePlanModel {
   Map<String, dynamic> toMap() => {
     'id': id,
     'userId': userId,
+    'diseaseId': diseaseId,
     'diseaseName': diseaseName,
     'scanImageUrl': scanImageUrl,
     'severity': severity,
@@ -98,6 +102,7 @@ class ActivePlanModel {
       ActivePlanModel(
         id: id,
         userId: userId,
+        diseaseId: diseaseId,
         diseaseName: diseaseName,
         scanImageUrl: scanImageUrl,
         severity: severity,

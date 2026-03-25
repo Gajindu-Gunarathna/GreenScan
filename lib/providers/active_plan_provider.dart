@@ -130,6 +130,10 @@ class ActivePlanProvider extends ChangeNotifier {
   Future<void> deletePlan(String userId) async {
     if (_activePlan == null) return;
 
+    // Set loading state so UI shows spinner, not blank
+    _state = ActivePlanState.loading;
+    notifyListeners();
+
     try {
       await _service.deletePlan(userId: userId, planId: _activePlan!.id);
     } catch (e) {

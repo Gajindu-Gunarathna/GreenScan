@@ -388,29 +388,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
 
         const SizedBox(height: 12),
-
-        // Delete plan button
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: () => _showDeleteDialog(context, planProvider, userId),
-            icon: const Icon(
-              Icons.delete_outline,
-              color: AppColors.error,
-              size: 18,
-            ),
-            label: const Text(
-              'Delete plan — scan new leaf',
-              style: TextStyle(color: AppColors.error),
-            ),
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: AppColors.error.withOpacity(0.5)),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -474,14 +451,15 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(context), // dialog — fine
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(context); // close dialog — fine
               await planProvider.deletePlan(userId);
               if (context.mounted) {
+                await planProvider.loadActivePlan(userId);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text(

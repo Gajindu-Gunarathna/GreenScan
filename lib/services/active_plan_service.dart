@@ -55,6 +55,7 @@ class ActivePlanService {
     final plan = ActivePlanModel(
       id: id,
       userId: userId,
+      diseaseId: scan.id,
       diseaseName: scan.diseaseName,
       scanImageUrl: scan.imageUrl,
       severity: scan.severity,

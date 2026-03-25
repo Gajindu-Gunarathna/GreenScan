@@ -8,8 +8,30 @@ import '../providers/active_plan_provider.dart';
 import '../providers/auth_provider.dart';
 import 'package:go_router/go_router.dart';
 
-class TreatmentScreen extends StatelessWidget {
+class TreatmentScreen extends StatefulWidget {
   const TreatmentScreen({super.key});
+
+  @override
+  State<TreatmentScreen> createState() => _TreatmentScreenState();
+}
+
+class _TreatmentScreenState extends State<TreatmentScreen> {
+  // [NEW] This handles loading the treatment if the user comes from the Roadmap
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final planProvider = context.read<PlanProvider>();
+
+      // If no treatment loaded (e.g., came from Roadmap via 'View full plan')
+      if (planProvider.currentTreatment == null) {
+        final activePlan = context.read<ActivePlanProvider>().activePlan;
+        if (activePlan != null && activePlan.diseaseId.isNotEmpty) {
+          planProvider.loadTreatment(activePlan.diseaseId);
+        }
+      }
+    });
+  }
 
   Future<void> _launchUrl(String url) async {
     final uri = Uri.parse(url);
@@ -29,7 +51,7 @@ class TreatmentScreen extends StatelessWidget {
         elevation: 0.5,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: const Text(
           'Treatments',
@@ -225,32 +247,6 @@ class TreatmentScreen extends StatelessWidget {
           ),
           const SizedBox(height: 24),
 
-          // Feedback button remains at the bottom
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Thank you for your feedback!'),
-                    backgroundColor: AppColors.success,
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                'Feedback',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
           const SizedBox(height: 32),
         ],
       ),
