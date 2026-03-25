@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/scan_provider.dart';
 import '../providers/plan_provider.dart';
+import '../providers/auth_provider.dart';
 import '../utils/app_colors.dart';
-import 'treatment_screen.dart';
 import 'package:go_router/go_router.dart';
 
 class ResultScreen extends StatelessWidget {
@@ -12,8 +12,11 @@ class ResultScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scan = context.watch<ScanProvider>().currentScan;
+    final currentUserId = context.watch<AuthProvider>().currentUser?.id;
 
-    if (scan == null) {
+    if (scan == null ||
+        currentUserId == null ||
+        scan.userId != currentUserId) {
       return const Scaffold(body: Center(child: Text('No scan result found')));
     }
 
@@ -196,14 +199,6 @@ class ResultScreen extends StatelessWidget {
                               if (!context.mounted) return;
 
                               context.push('/treatment');
-
-                              //Navigates to TreatmentScans
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const TreatmentScreen(),
-                                ),
-                              );
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,

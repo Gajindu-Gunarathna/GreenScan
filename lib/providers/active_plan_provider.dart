@@ -22,8 +22,17 @@ class ActivePlanProvider extends ChangeNotifier {
   String get errorMessage => _errorMessage;
   bool get hasPlan => _activePlan != null;
 
+  String _planCacheKey(String userId) => 'active_plan_$userId';
+
   // Load plan on app start
   Future<void> loadActivePlan(String userId) async {
+    if (userId.trim().isEmpty || userId == 'temp_user_id') {
+      _activePlan = null;
+      _state = ActivePlanState.loaded;
+      notifyListeners();
+      return;
+    }
+
     _state = ActivePlanState.loading;
     notifyListeners();
 
@@ -35,7 +44,7 @@ class ActivePlanProvider extends ChangeNotifier {
       if (_activePlan == null) {
         final cached = LocalStorageService.get(
           AppConstants.userBox,
-          'active_plan',
+          _planCacheKey(userId),
         );
         if (cached != null) {
           _activePlan = ActivePlanModel.fromMap(cached);
@@ -47,7 +56,7 @@ class ActivePlanProvider extends ChangeNotifier {
       // Fall back to local cache on error
       final cached = LocalStorageService.get(
         AppConstants.userBox,
-        'active_plan',
+        _planCacheKey(userId),
       );
       if (cached != null) {
         _activePlan = ActivePlanModel.fromMap(cached);
@@ -85,7 +94,7 @@ class ActivePlanProvider extends ChangeNotifier {
       );
 
       // Cache locally
-      _cacheLocally();
+      _cacheLocally(userId);
 
       _state = ActivePlanState.loaded;
     } catch (e) {
@@ -109,7 +118,7 @@ class ActivePlanProvider extends ChangeNotifier {
         plan: _activePlan!,
         stepId: stepId,
       );
-      _cacheLocally();
+      _cacheLocally(userId);
       notifyListeners();
     } catch (e) {
       // Toggle locally even if Firestore fails
@@ -120,7 +129,7 @@ class ActivePlanProvider extends ChangeNotifier {
         return step;
       }).toList();
       _activePlan = _activePlan!.copyWith(steps: updatedSteps);
-      _cacheLocally();
+      _cacheLocally(userId);
       notifyListeners();
     }
   }
@@ -140,15 +149,17 @@ class ActivePlanProvider extends ChangeNotifier {
     }
 
     _activePlan = null;
+    LocalStorageService.delete(AppConstants.userBox, _planCacheKey(userId));
+    // Legacy cleanup from old shared key.
     LocalStorageService.delete(AppConstants.userBox, 'active_plan');
     notifyListeners();
   }
 
-  void _cacheLocally() {
+  void _cacheLocally(String userId) {
     if (_activePlan != null) {
       LocalStorageService.save(
         AppConstants.userBox,
-        'active_plan',
+        _planCacheKey(userId),
         _activePlan!.toMap(),
       );
     }

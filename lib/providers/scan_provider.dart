@@ -53,7 +53,11 @@ class ScanProvider extends ChangeNotifier {
       _currentScan = scan;
 
       // Save to local cache
-      LocalStorageService.save(AppConstants.scansBox, scan.id, scan.toMap());
+      LocalStorageService.save(
+        AppConstants.scansBox,
+        '${scan.userId}_${scan.id}',
+        scan.toMap(),
+      );
 
       // Save to Firestore
       await FirebaseFirestore.instance
@@ -78,9 +82,12 @@ class ScanProvider extends ChangeNotifier {
   }
 
   // Load history from local cache
-  void loadScanHistory() {
+  void loadScanHistory(String userId) {
     final raw = LocalStorageService.getAll(AppConstants.scansBox);
-    _scanHistory = raw.map((e) => ScanModel.fromMap(e)).toList();
+    _scanHistory = raw
+        .map((e) => ScanModel.fromMap(e))
+        .where((scan) => scan.userId == userId)
+        .toList();
     _scanHistory.sort((a, b) => b.timestamp.compareTo(a.timestamp));
     notifyListeners();
   }

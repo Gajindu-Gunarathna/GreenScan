@@ -146,11 +146,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
               ),
               const SizedBox(height: 20),
-
-              // ── District alert ──────────────────────────────
-              if (planProvider.districtAlert != null)
-                _buildDistrictAlert(planProvider.districtAlert!),
-
+              _buildAnalysisOverview(
+                planProvider: planProvider,
+                district: authProvider.currentUser?.district ?? 'Colombo',
+              ),
               const SizedBox(height: 16),
 
               // ── Active plan ─────────────────────────────────
@@ -170,80 +169,155 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildDistrictAlert(Map<String, dynamic> alert) {
-    final cases = (alert['totalCases'] ?? 0) as int;
-    final riskText = _riskLabel(cases);
-    final riskColor = _riskColor(cases);
+  Widget _buildAnalysisOverview({
+    required ActivePlanProvider planProvider,
+    required String district,
+  }) {
+    final plan = planProvider.activePlan;
+    final alert = planProvider.districtAlert;
+    final int caseCount = (alert?['totalCases'] ?? 0) as int;
+    final String risk = _riskLabel(caseCount);
+    final Color riskColor = _riskColor(caseCount);
+    final int pendingSteps = plan == null
+        ? 0
+        : plan.steps.where((s) => !s.isDone).length;
+    final String severity = plan?.severity ?? 'unknown';
+    final String severityLabel = severity.isEmpty
+        ? 'Unknown'
+        : '${severity[0].toUpperCase()}${severity.substring(1)}';
+    final Color severityColor = switch (severity.toLowerCase()) {
+      'high' => AppColors.error,
+      'medium' => AppColors.warning,
+      'low' => AppColors.success,
+      _ => AppColors.textSecondary,
+    };
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.error.withAlpha(20),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.error.withAlpha(76)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
-            Icons.warning_amber_rounded,
-            color: AppColors.error,
-            size: 28,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Alert — ${alert['district']}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.error,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: riskColor.withAlpha(35),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        riskText,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: riskColor,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      '$cases cases',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '${alert['diseaseName']} is currently the most reported disease in your district. Check your leaves and scan early.',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
+          const Text(
+            'Analysis Overview',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
             ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Live status for $district district and your current treatment progress.',
+            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _metricTile(
+                  title: 'District Risk',
+                  value: risk,
+                  hint: caseCount == 0 ? 'No active alerts' : '$caseCount cases',
+                  valueColor: riskColor,
+                  icon: Icons.shield_outlined,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _metricTile(
+                  title: 'Current Severity',
+                  value: severityLabel,
+                  hint: plan == null ? 'No active case' : 'Latest detected level',
+                  valueColor: severityColor,
+                  icon: Icons.health_and_safety_outlined,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _metricTile(
+                  title: 'Pending Actions',
+                  value: '$pendingSteps',
+                  hint: pendingSteps == 0 ? 'All clear' : 'Steps to complete',
+                  valueColor: pendingSteps == 0 ? AppColors.success : AppColors.warning,
+                  icon: Icons.task_alt_outlined,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _metricTile(
+                  title: 'Detected Disease',
+                  value: plan?.diseaseName ?? 'Not scanned',
+                  hint: plan == null ? 'Scan to detect' : 'Current active case',
+                  valueColor: AppColors.textPrimary,
+                  icon: Icons.biotech_outlined,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _metricTile({
+    required String title,
+    required String value,
+    required String hint,
+    required Color valueColor,
+    required IconData icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 16, color: AppColors.textSecondary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: valueColor,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            hint,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
           ),
         ],
       ),
