@@ -128,4 +128,15 @@ class ForumProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<void> deletePost(String postId) async {
+    try {
+      await _forumService.deletePost(postId: postId);
+      _posts.removeWhere((p) => p.id == postId);
+      notifyListeners();
+    } catch (e) {
+      _errorMessage = 'Could not delete post: ${e.toString()}';
+      notifyListeners();
+    }
+  }
 }

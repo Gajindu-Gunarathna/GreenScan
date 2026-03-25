@@ -3,6 +3,9 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../providers/active_plan_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/notification_provider.dart';
+import '../services/local_storage_service.dart';
+import '../utils/app_constants.dart';
 import '../utils/app_colors.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -16,14 +19,20 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final auth = context.read<AuthProvider>();
       final planProvider = context.read<ActivePlanProvider>();
       final userId = auth.currentUser?.id ?? 'temp_user_id';
       final district = auth.currentUser?.district ?? 'Colombo';
 
-      planProvider.loadActivePlan(userId);
-      planProvider.loadDistrictAlert(district);
+      await planProvider.loadActivePlan(userId);
+      await planProvider.loadDistrictAlert(district);
+      if (mounted) {
+        await _triggerSmartNotifications(
+          userId: userId,
+          planProvider: planProvider,
+        );
+      }
     });
   }
 
@@ -31,6 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final planProvider = context.watch<ActivePlanProvider>();
     final authProvider = context.watch<AuthProvider>();
+    final notificationProvider = context.watch<NotificationProvider>();
     final userId = authProvider.currentUser?.id ?? 'temp_user_id';
     final userName = authProvider.currentUser?.name ?? 'Farmer';
 
@@ -62,6 +72,43 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
+            onPressed: () => _showNotifications(context),
+            tooltip: 'Notifications',
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.notifications_none, color: AppColors.primary),
+                if (notificationProvider.unreadCount > 0)
+                  Positioned(
+                    right: -4,
+                    top: -3,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: AppColors.error,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      child: Text(
+                        notificationProvider.unreadCount > 9
+                            ? '9+'
+                            : '${notificationProvider.unreadCount}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          IconButton(
             icon: const Icon(Icons.document_scanner, color: AppColors.primary),
             onPressed: () => context.go('/camera'),
             tooltip: 'Scan new leaf',
@@ -73,6 +120,10 @@ class _HomeScreenState extends State<HomeScreen> {
           final district = authProvider.currentUser?.district ?? 'Colombo';
           await planProvider.loadActivePlan(userId);
           await planProvider.loadDistrictAlert(district);
+          await _triggerSmartNotifications(
+            userId: userId,
+            planProvider: planProvider,
+          );
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -120,12 +171,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildDistrictAlert(Map<String, dynamic> alert) {
+    final cases = (alert['totalCases'] ?? 0) as int;
+    final riskText = _riskLabel(cases);
+    final riskColor = _riskColor(cases);
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.error.withOpacity(0.08),
+        color: AppColors.error.withAlpha(20),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.error.withOpacity(0.3)),
+        border: Border.all(color: AppColors.error.withAlpha(76)),
       ),
       child: Row(
         children: [
@@ -147,10 +202,41 @@ class _HomeScreenState extends State<HomeScreen> {
                     fontSize: 13,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: riskColor.withAlpha(35),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        riskText,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: riskColor,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '$cases cases',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
                 Text(
-                  '${alert['diseaseName']} is spreading '
-                  '(${alert['totalCases']} cases reported)',
+                  '${alert['diseaseName']} is currently the most reported disease in your district. Check your leaves and scan early.',
                   style: const TextStyle(
                     fontSize: 13,
                     color: AppColors.textPrimary,
@@ -389,6 +475,136 @@ class _HomeScreenState extends State<HomeScreen> {
 
         const SizedBox(height: 12),
       ],
+    );
+  }
+
+  String _riskLabel(int cases) {
+    if (cases >= 50) return 'High risk';
+    if (cases >= 20) return 'Medium risk';
+    return 'Early warning';
+  }
+
+  Color _riskColor(int cases) {
+    if (cases >= 50) return AppColors.error;
+    if (cases >= 20) return AppColors.warning;
+    return AppColors.primary;
+  }
+
+  Future<void> _triggerSmartNotifications({
+    required String userId,
+    required ActivePlanProvider planProvider,
+  }) async {
+    final notificationProvider = context.read<NotificationProvider>();
+    final alert = planProvider.districtAlert;
+    final plan = planProvider.activePlan;
+
+    if (alert != null) {
+      final signature =
+          '${alert['district']}_${alert['diseaseName']}_${alert['totalCases']}';
+      final last = LocalStorageService.getString(
+        AppConstants.userBox,
+        'last_alert_$userId',
+      );
+      if (last != signature) {
+        notificationProvider.addNotification(
+          'District Alert',
+          '${alert['diseaseName']} is increasing in ${alert['district']} (${alert['totalCases']} cases).',
+        );
+        await LocalStorageService.saveString(
+          AppConstants.userBox,
+          'last_alert_$userId',
+          signature,
+        );
+      }
+    }
+
+    if (plan != null && !plan.isCompleted) {
+      final pending = plan.steps.where((s) => !s.isDone).length;
+      if (pending > 0) {
+        final today = DateTime.now().toIso8601String().split('T').first;
+        final reminderKey = '${plan.id}_$today';
+        final lastReminder = LocalStorageService.getString(
+          AppConstants.userBox,
+          'last_plan_reminder_$userId',
+        );
+        if (lastReminder != reminderKey) {
+          notificationProvider.addNotification(
+            'Treatment Reminder',
+            'You still have $pending pending step${pending > 1 ? 's' : ''} in your treatment plan.',
+          );
+          await LocalStorageService.saveString(
+            AppConstants.userBox,
+            'last_plan_reminder_$userId',
+            reminderKey,
+          );
+        }
+      }
+    }
+
+    if (plan != null && plan.isCompleted) {
+      final lastCompleted = LocalStorageService.getString(
+        AppConstants.userBox,
+        'last_completed_plan_$userId',
+      );
+      if (lastCompleted != plan.id) {
+        notificationProvider.addNotification(
+          'Plan Completed',
+          'Great job! You completed your ${plan.diseaseName} treatment plan.',
+        );
+        await LocalStorageService.saveString(
+          AppConstants.userBox,
+          'last_completed_plan_$userId',
+          plan.id,
+        );
+      }
+    }
+  }
+
+  void _showNotifications(BuildContext context) {
+    final notificationProvider = context.read<NotificationProvider>();
+    final items = List<Map<String, dynamic>>.from(notificationProvider.notifications);
+    notificationProvider.markAllRead();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) {
+        if (items.isEmpty) {
+          return const SizedBox(
+            height: 180,
+            child: Center(
+              child: Text(
+                'No notifications yet.',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ),
+          );
+        }
+
+        return SafeArea(
+          child: ListView.separated(
+            shrinkWrap: true,
+            padding: const EdgeInsets.all(16),
+            itemCount: items.length,
+            separatorBuilder: (_, __) => const Divider(height: 12),
+            itemBuilder: (_, i) {
+              final n = items[i];
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.notifications, color: AppColors.primary),
+                title: Text(
+                  n['title']?.toString() ?? 'Notification',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(n['body']?.toString() ?? ''),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 

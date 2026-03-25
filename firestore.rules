@@ -10,10 +10,8 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && (
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin"
-      );
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     // User profiles

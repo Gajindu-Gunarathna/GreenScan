@@ -4,6 +4,7 @@ import '../models/forum_post_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/forum_provider.dart';
 import '../services/forum_service.dart';
+import '../services/admin_service.dart';
 import '../utils/app_colors.dart';
 
 class ForumPostDetailScreen extends StatefulWidget {
@@ -17,6 +18,7 @@ class ForumPostDetailScreen extends StatefulWidget {
 class _ForumPostDetailScreenState extends State<ForumPostDetailScreen> {
   final _replyController = TextEditingController();
   final _service = ForumService();
+  final _adminService = AdminService();
   bool _sending = false;
 
   @override
@@ -49,6 +51,9 @@ class _ForumPostDetailScreenState extends State<ForumPostDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final userId = auth.currentUser?.id ?? '';
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -61,6 +66,48 @@ class _ForumPostDetailScreenState extends State<ForumPostDetailScreen> {
             fontWeight: FontWeight.bold,
           ),
         ),
+        actions: [
+          FutureBuilder<bool>(
+            future: _adminService.isAdmin(userId),
+            builder: (context, snap) {
+              final isAdmin = snap.data == true;
+              if (!isAdmin) return const SizedBox.shrink();
+              return IconButton(
+                tooltip: 'Delete post',
+                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                onPressed: () async {
+                  final shouldDelete = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Delete post?'),
+                      content: const Text(
+                        'This will permanently delete the post from the community.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text('Delete'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (shouldDelete != true) return;
+
+                  await _service.deletePost(postId: widget.postId);
+                  if (context.mounted) Navigator.pop(context);
+                },
+              );
+            },
+          ),
+        ],
       ),
       body: StreamBuilder<ForumPostModel?>(
         stream: _service.watchPost(widget.postId),

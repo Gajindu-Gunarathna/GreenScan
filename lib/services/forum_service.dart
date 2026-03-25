@@ -134,4 +134,8 @@ class ForumService {
     required String postId,
     required String adminUserId,
   }) async {}
+
+  Future<void> deletePost({required String postId}) async {
+    await _db.collection('forum_posts').doc(postId).delete();
+  }
 }

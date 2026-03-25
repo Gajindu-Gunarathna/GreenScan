@@ -5,6 +5,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import '../providers/auth_provider.dart';
 import '../providers/forum_provider.dart';
 import '../services/ai_service.dart';
+import '../services/admin_service.dart';
 import '../utils/app_colors.dart';
 
 class CommunityScreen extends StatefulWidget {
@@ -19,6 +20,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
   final _aiQuestionController = TextEditingController();
   final _aiService = AiService();
   final _tts = FlutterTts();
+  final _adminService = AdminService();
+  bool _isAdmin = false;
 
   String? _aiAnswer;
   bool _askingAi = false;
@@ -28,6 +31,11 @@ class _CommunityScreenState extends State<CommunityScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = context.read<AuthProvider>();
+      final userId = auth.currentUser?.id ?? '';
+      _adminService.isAdmin(userId).then((v) {
+        if (mounted) setState(() => _isAdmin = v);
+      });
       context.read<ForumProvider>().loadPosts();
     });
   }
@@ -123,6 +131,34 @@ class _CommunityScreenState extends State<CommunityScreen> {
     });
   }
 
+  Future<void> _logout() async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Do you want to log out now?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+    if (shouldLogout != true) return;
+
+    await context.read<AuthProvider>().logout();
+    if (mounted) context.go('/login');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -137,6 +173,13 @@ class _CommunityScreenState extends State<CommunityScreen> {
             fontWeight: FontWeight.bold,
           ),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Logout',
+            onPressed: _logout,
+            icon: const Icon(Icons.logout, color: AppColors.error),
+          ),
+        ],
       ),
       body: DefaultTabController(
         length: 2,
@@ -421,7 +464,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
               ),
             )
           else
-            ...forum.posts.map((p) => _PostCard(postId: p.id)),
+            ...forum.posts
+                .map((p) => _PostCard(postId: p.id, isAdmin: _isAdmin)),
         ],
       ),
     );
@@ -430,7 +474,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
 class _PostCard extends StatelessWidget {
   final String postId;
-  const _PostCard({required this.postId});
+  final bool isAdmin;
+  const _PostCard({required this.postId, required this.isAdmin});
 
   @override
   Widget build(BuildContext context) {
@@ -481,6 +526,43 @@ class _PostCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (isAdmin) ...[
+                  IconButton(
+                    tooltip: 'Delete post',
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    onPressed: () async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      final shouldDelete = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Delete post?'),
+                          content: const Text(
+                            'This will permanently delete the post from the community.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                              ),
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text('Delete'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (shouldDelete != true) return;
+                      await context.read<ForumProvider>().deletePost(post.id);
+                      messenger.showSnackBar(
+                        const SnackBar(content: Text('Post deleted.')),
+                      );
+                    },
+                  ),
+                ],
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(

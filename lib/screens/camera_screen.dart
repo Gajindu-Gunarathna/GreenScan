@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import '../providers/scan_provider.dart';
 import '../services/connectivity_service.dart';
 import '../utils/app_colors.dart';
-import 'result_screen.dart';
 import '../providers/auth_provider.dart';
 
 class CameraScreen extends StatefulWidget {
@@ -77,10 +77,7 @@ class _CameraScreenState extends State<CameraScreen> {
       final scanProvider = context.read<ScanProvider>();
 
       if (scanProvider.state == ScanState.success) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const ResultScreen()),
-        );
+        context.push('/result');
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -121,7 +118,13 @@ class _CameraScreenState extends State<CameraScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else {
+              context.go('/home');
+            }
+          },
         ),
         title: const Text('GreenScan', style: TextStyle(color: Colors.white)),
       ),

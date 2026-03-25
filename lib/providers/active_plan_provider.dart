@@ -5,7 +5,6 @@ import '../models/scan_model.dart';
 import '../services/active_plan_service.dart';
 import '../services/local_storage_service.dart';
 import '../utils/app_constants.dart';
-import 'dart:convert';
 
 enum ActivePlanState { idle, loading, loaded, error }
 
