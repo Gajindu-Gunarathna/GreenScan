@@ -3,11 +3,6 @@ class AppConstants {
   static const String aiBaseUrl = 'http://192.168.1.64:8000';
   static const String predictEndpoint = '/predict';
 
-  // Claude API
-  static const String claudeApiUrl = 'https://api.anthropic.com/v1/messages';
-  // Put your key in here later — we'll move to env file before release
-  static const String claudeApiKey = 'YOUR_CLAUDE_API_KEY';
-
   // WhatsApp
   static const String whatsappNumber = '94702201920';
   static const String whatsappDefaultMessage =

@@ -42,6 +42,9 @@ class ForumPostModel {
   final String? imageUrl;
   final List<ForumReply> replies;
   final int likes;
+  final String moderationStatus; // pending | approved | rejected
+  final String? approvedBy;
+  final DateTime? approvedAt;
   final DateTime timestamp;
 
   ForumPostModel({
@@ -52,6 +55,9 @@ class ForumPostModel {
     this.imageUrl,
     required this.replies,
     required this.likes,
+    required this.moderationStatus,
+    this.approvedBy,
+    this.approvedAt,
     required this.timestamp,
   });
 
@@ -65,6 +71,9 @@ class ForumPostModel {
         .map((e) => ForumReply.fromMap(e))
         .toList(),
     likes: map['likes'] ?? 0,
+    moderationStatus: map['moderationStatus'] ?? 'approved',
+    approvedBy: map['approvedBy'],
+    approvedAt: map['approvedAt'] != null ? DateTime.parse(map['approvedAt']) : null,
     timestamp: DateTime.parse(map['timestamp']),
   );
 
@@ -76,6 +85,9 @@ class ForumPostModel {
     'imageUrl': imageUrl,
     'replies': replies.map((e) => e.toMap()).toList(),
     'likes': likes,
+    'moderationStatus': moderationStatus,
+    'approvedBy': approvedBy,
+    'approvedAt': approvedAt?.toIso8601String(),
     'timestamp': timestamp.toIso8601String(),
   };
 }

@@ -22,7 +22,7 @@ class ForumProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _posts = await _forumService.getPosts();
+      _posts = await _forumService.getPostsFeed();
       _state = ForumState.success;
     } catch (e) {
       _errorMessage = 'Could not load posts: ${e.toString()}';
@@ -32,13 +32,14 @@ class ForumProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> createPost({
+  Future<ForumPostModel?> createPost({
     required String userId,
     required String userName,
     required String content,
     String? imageUrl,
   }) async {
     _isPosting = true;
+    _errorMessage = '';
     notifyListeners();
 
     try {
@@ -64,10 +65,43 @@ class ForumProvider extends ChangeNotifier {
       });
     } catch (e) {
       _errorMessage = 'Could not create post: ${e.toString()}';
+      return null;
+    } finally {
+      _isPosting = false;
+      notifyListeners();
     }
+    return _posts.isNotEmpty ? _posts.first : null;
+  }
 
-    _isPosting = false;
-    notifyListeners();
+  Future<ForumPostModel?> createPostWithAiAnswer({
+    required String userId,
+    required String userName,
+    required String question,
+    required String aiAnswer,
+    String? imageUrl,
+  }) async {
+    final post = await createPost(
+      userId: userId,
+      userName: userName,
+      content: question,
+      imageUrl: imageUrl,
+    );
+    if (post == null) return null;
+
+    try {
+      final updated = await _forumService.addAiReply(
+        postId: post.id,
+        content: aiAnswer,
+      );
+      final index = _posts.indexWhere((p) => p.id == post.id);
+      if (index != -1) {
+        _posts[index] = updated;
+        notifyListeners();
+      }
+      return updated;
+    } catch (e) {
+      return post;
+    }
   }
 
   Future<void> addReply({

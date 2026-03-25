@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import '../providers/auth_provider.dart';
+import '../providers/forum_provider.dart';
+import '../services/ai_service.dart';
 import '../utils/app_colors.dart';
 
 class CommunityScreen extends StatefulWidget {
@@ -10,6 +16,112 @@ class CommunityScreen extends StatefulWidget {
 
 class _CommunityScreenState extends State<CommunityScreen> {
   final _postController = TextEditingController();
+  final _aiQuestionController = TextEditingController();
+  final _aiService = AiService();
+  final _tts = FlutterTts();
+
+  String? _aiAnswer;
+  bool _askingAi = false;
+  bool _speaking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ForumProvider>().loadPosts();
+    });
+  }
+
+  @override
+  void dispose() {
+    _tts.stop();
+    _postController.dispose();
+    _aiQuestionController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _askAi() async {
+    final q = _aiQuestionController.text.trim();
+    if (q.isEmpty || _askingAi) return;
+
+    setState(() {
+      _askingAi = true;
+      _aiAnswer = null;
+      _speaking = false;
+    });
+    await _tts.stop();
+
+    try {
+      final ans = await _aiService.askBetelAssistant(question: q);
+      if (!mounted) return;
+      setState(() => _aiAnswer = ans);
+    } finally {
+      if (mounted) setState(() => _askingAi = false);
+    }
+  }
+
+  Future<void> _postToCommunity({required String content, String? aiAnswer}) async {
+    final auth = context.read<AuthProvider>();
+    final forum = context.read<ForumProvider>();
+
+    final userId = auth.currentUser?.id ?? 'temp_user_id';
+    final userName = auth.currentUser?.name ?? 'Farmer';
+
+    if (aiAnswer != null && aiAnswer.trim().isNotEmpty) {
+      final post = await forum.createPostWithAiAnswer(
+        userId: userId,
+        userName: userName,
+        question: content,
+        aiAnswer: aiAnswer,
+      );
+      if (!mounted) return;
+      if (post != null) {
+        _aiQuestionController.clear();
+        setState(() => _aiAnswer = null);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Posted to community.')),
+        );
+        context.push('/community/post/${post.id}');
+      }
+      return;
+    }
+
+    final post = await forum.createPost(
+      userId: userId,
+      userName: userName,
+      content: content,
+    );
+    if (!mounted) return;
+    if (post != null) {
+      _postController.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Posted.')),
+      );
+      context.push('/community/post/${post.id}');
+    }
+  }
+
+  Future<void> _toggleSpeak() async {
+    final text = _aiAnswer?.trim() ?? '';
+    if (text.isEmpty) return;
+
+    if (_speaking) {
+      await _tts.stop();
+      if (mounted) setState(() => _speaking = false);
+      return;
+    }
+
+    setState(() => _speaking = true);
+    await _tts.setLanguage('en-US');
+    await _tts.setSpeechRate(0.45);
+    await _tts.speak(text);
+    _tts.setCompletionHandler(() {
+      if (mounted) setState(() => _speaking = false);
+    });
+    _tts.setErrorHandler((_) {
+      if (mounted) setState(() => _speaking = false);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,143 +130,366 @@ class _CommunityScreenState extends State<CommunityScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
-        title: Row(
+        title: const Text(
+          'Community',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+      body: DefaultTabController(
+        length: 2,
+        child: Column(
           children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(6),
+            const Material(
+              color: Colors.white,
+              child: TabBar(
+                labelColor: AppColors.primary,
+                unselectedLabelColor: AppColors.textSecondary,
+                indicatorColor: AppColors.primary,
+                tabs: [
+                  Tab(text: 'Ask AI'),
+                  Tab(text: 'Community'),
+                ],
               ),
-              child: const Icon(Icons.eco, color: Colors.white, size: 18),
             ),
-            const SizedBox(width: 8),
-            const Text(
-              'GreenScan',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.bold,
+            Expanded(
+              child: TabBarView(
+                children: [
+                  _buildAskAiTab(),
+                  _buildCommunityTab(),
+                ],
               ),
             ),
           ],
         ),
       ),
-      body: Column(
-        children: [
-          // ── UI TEAM: Style post composer box ──
-          Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _postController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    hintText: 'Share your experience or ask a question...',
-                    border: InputBorder.none,
-                  ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.image_outlined),
-                      onPressed: () {},
-                      // ── UI TEAM: Style image attach button ──
-                    ),
-                    ElevatedButton(
-                      onPressed: () {},
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
-                      child: const Text('Post Experience'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // Posts list
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: 3, // placeholder count
-              itemBuilder: (_, index) => _buildPostCard(index),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
-  // ── UI TEAM: Replace with ForumPostCard widget from designs ──
-  Widget _buildPostCard(int index) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+  Widget _buildAskAiTab() {
+    return ListView(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                backgroundColor: AppColors.primaryLight.withOpacity(0.3),
-                child: const Icon(Icons.person, color: AppColors.primary),
+              const Text(
+                'Ask GreenScan AI',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
               ),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Farmer ${index + 1}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _aiQuestionController,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  hintText: 'Ask about betel diseases, prevention, soil, watering…',
+                  filled: true,
+                  fillColor: AppColors.background,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
                   ),
-                  const Text(
-                    '2 hours ago',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _askingAi ? null : _askAi,
+                      icon: _askingAi
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.smart_toy),
+                      label: const Text('Get AI Answer'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          const Text(
-            'My betel leaves are showing yellow spots. What should I do?',
-          ),
-          const SizedBox(height: 10),
-          // AI reply indicator
+        ),
+        const SizedBox(height: 14),
+        if (_aiAnswer != null) ...[
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.circular(8),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
             ),
-            child: const Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.smart_toy, color: AppColors.primary, size: 16),
-                SizedBox(width: 6),
+                Row(
+                  children: const [
+                    Icon(Icons.smart_toy, color: AppColors.primary, size: 18),
+                    SizedBox(width: 8),
+                    Text(
+                      'AI Answer',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  _aiAnswer!,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _toggleSpeak,
+                    icon: Icon(_speaking ? Icons.stop : Icons.volume_up),
+                    label: Text(_speaking ? 'Stop' : 'Listen'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          setState(() => _aiAnswer = null);
+                        },
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Ask again'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _postToCommunity(
+                          content: _aiQuestionController.text.trim(),
+                          aiAnswer: _aiAnswer,
+                        ),
+                        icon: const Icon(Icons.forum),
+                        label: const Text('Ask Community'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'If you are not satisfied, post this to the community so others can reply.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildCommunityTab() {
+    final forum = context.watch<ForumProvider>();
+    return RefreshIndicator(
+      onRefresh: () => context.read<ForumProvider>().loadPosts(),
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Post a question',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _postController,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    hintText: 'Ask the community about a disease, treatment, or farming issue…',
+                    filled: true,
+                    fillColor: AppColors.background,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: forum.isPosting
+                        ? null
+                        : () => _postToCommunity(content: _postController.text.trim()),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: forum.isPosting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('Post'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (forum.state == ForumState.loading)
+            const Padding(
+              padding: EdgeInsets.only(top: 32),
+              child: Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              ),
+            )
+          else if (forum.state == ForumState.error)
+            Padding(
+              padding: const EdgeInsets.only(top: 24),
+              child: Text(
+                forum.errorMessage,
+                style: const TextStyle(color: AppColors.error),
+              ),
+            )
+          else if (forum.posts.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 24),
+              child: Text(
+                'No posts yet. Ask a question to start the community.',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            )
+          else
+            ...forum.posts.map((p) => _PostCard(postId: p.id)),
+        ],
+      ),
+    );
+  }
+}
+
+class _PostCard extends StatelessWidget {
+  final String postId;
+  const _PostCard({required this.postId});
+
+  @override
+  Widget build(BuildContext context) {
+    final forum = context.watch<ForumProvider>();
+    final post = forum.posts.firstWhere((p) => p.id == postId);
+
+    final aiReply = post.replies.where((r) => r.isAiReply).toList();
+    final latestAi = aiReply.isNotEmpty ? aiReply.last : null;
+
+    return InkWell(
+      onTap: () => context.push('/community/post/${post.id}'),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: AppColors.primaryLight.withAlpha(64),
+                  child: const Icon(Icons.person, color: AppColors.primary),
+                ),
+                const SizedBox(width: 10),
                 Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        post.userName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        _timeAgo(post.timestamp),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
                   child: Text(
-                    'GreenScan AI: Yellow spots may indicate rust disease...',
-                    style: TextStyle(
+                    '${post.replies.where((r) => !r.isAiReply).length} replies',
+                    style: const TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
                     ),
@@ -162,24 +497,63 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              TextButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.thumb_up_outlined, size: 16),
-                label: const Text('Helpful'),
-              ),
-              TextButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.reply, size: 16),
-                label: const Text('Reply'),
+            const SizedBox(height: 10),
+            Text(
+              post.content,
+              style: const TextStyle(color: AppColors.textPrimary, height: 1.35),
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (latestAi != null) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.primary.withAlpha(38)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.smart_toy, color: AppColors.primary, size: 16),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'AI: ${latestAi.content}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                        maxLines: 4,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
-          ),
-        ],
+            const SizedBox(height: 8),
+            Row(
+              children: const [
+                Icon(Icons.chat_bubble_outline, size: 16, color: AppColors.textSecondary),
+                SizedBox(width: 6),
+                Text(
+                  'Tap to view & reply',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
+}
+
+String _timeAgo(DateTime dt) {
+  final diff = DateTime.now().difference(dt);
+  if (diff.inMinutes < 1) return 'just now';
+  if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+  if (diff.inHours < 24) return '${diff.inHours}h ago';
+  return '${diff.inDays}d ago';
 }

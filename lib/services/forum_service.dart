@@ -1,24 +1,21 @@
-import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../models/forum_post_model.dart';
-import '../utils/secrets.dart';
+import 'ai_service.dart';
 
 class ForumService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final _uuid = const Uuid();
+  final AiService _ai = AiService();
 
-  Future<List<ForumPostModel>> getPosts() async {
+  Future<List<ForumPostModel>> getPostsFeed() async {
     final snapshot = await _db
         .collection('forum_posts')
         .orderBy('timestamp', descending: true)
-        .limit(50)
+        .limit(100)
         .get();
 
-    return snapshot.docs
-        .map((doc) => ForumPostModel.fromMap(doc.data()))
-        .toList();
+    return snapshot.docs.map((d) => ForumPostModel.fromMap(d.data())).toList();
   }
 
   Future<ForumPostModel> createPost({
@@ -36,6 +33,9 @@ class ForumService {
       imageUrl: imageUrl,
       replies: [],
       likes: 0,
+      moderationStatus: 'approved',
+      approvedBy: null,
+      approvedAt: null,
       timestamp: DateTime.now(),
     );
 
@@ -43,42 +43,21 @@ class ForumService {
     return post;
   }
 
-  // Calls Claude API to generate an intelligent reply
+  Stream<ForumPostModel?> watchPost(String postId) {
+    return _db.collection('forum_posts').doc(postId).snapshots().map((doc) {
+      final data = doc.data();
+      if (data == null) return null;
+      return ForumPostModel.fromMap(data);
+    });
+  }
+
+  // Generates an AI reply (free-tier: Gemini) and saves it.
   Future<ForumPostModel> generateAiReply({
     required String postId,
     required String content,
   }) async {
     try {
-      final response = await http
-          .post(
-            Uri.parse('https://api.anthropic.com/v1/messages'),
-            headers: {
-              'Content-Type': 'application/json',
-              'x-api-key': Secrets.claudeApiKey,
-              'anthropic-version': '2023-06-01',
-            },
-            body: jsonEncode({
-              'model': 'claude-haiku-4-5-20251001',
-              'max_tokens': 300,
-              'system': '''You are an expert agricultural assistant 
-          specializing in betel leaf cultivation in Sri Lanka. 
-          Give practical, helpful advice in simple language. 
-          Keep replies concise and actionable.''',
-              'messages': [
-                {'role': 'user', 'content': content},
-              ],
-            }),
-          )
-          .timeout(const Duration(seconds: 20));
-
-      String aiReplyText =
-          'Thank you for your question. '
-          'Please consult your local agricultural officer for guidance.';
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        aiReplyText = data['content'][0]['text'] as String;
-      }
+      final aiReplyText = await _ai.draftForumReply(question: content);
 
       // Save AI reply to Firestore
       final replyId = _uuid.v4();
@@ -105,6 +84,28 @@ class ForumService {
     }
   }
 
+  Future<ForumPostModel> addAiReply({
+    required String postId,
+    required String content,
+  }) async {
+    final replyId = _uuid.v4();
+    final aiReply = ForumReply(
+      id: replyId,
+      userId: 'ai_assistant',
+      userName: 'GreenScan AI',
+      content: content,
+      isAiReply: true,
+      timestamp: DateTime.now(),
+    );
+
+    await _db.collection('forum_posts').doc(postId).update({
+      'replies': FieldValue.arrayUnion([aiReply.toMap()]),
+    });
+
+    final doc = await _db.collection('forum_posts').doc(postId).get();
+    return ForumPostModel.fromMap(doc.data()!);
+  }
+
   Future<ForumPostModel> addReply({
     required String postId,
     required String userId,
@@ -127,4 +128,10 @@ class ForumService {
     final doc = await _db.collection('forum_posts').doc(postId).get();
     return ForumPostModel.fromMap(doc.data()!);
   }
+
+  Future<List<ForumPostModel>> getPendingPostsForAdmin() async => [];
+  Future<void> approvePost({
+    required String postId,
+    required String adminUserId,
+  }) async {}
 }

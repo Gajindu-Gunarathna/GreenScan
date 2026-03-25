@@ -16,6 +16,8 @@ import '../screens/result_screen.dart';
 import '../screens/treatment_screen.dart';
 import '../screens/hotlines_screen.dart';
 import '../screens/roadmap_screen.dart';
+import '../screens/forum_post_detail_screen.dart';
+import '../screens/admin_review_screen.dart';
 
 GoRouter createRouter(BuildContext context) {
   return GoRouter(
@@ -44,7 +46,10 @@ GoRouter createRouter(BuildContext context) {
       GoRoute(path: '/result', builder: (_, _) => const ResultScreen()),
       GoRoute(path: '/treatment', builder: (_, _) => const TreatmentScreen()),
       GoRoute(path: '/hotlines', builder: (_, _) => const HotlinesScreen()),
-      GoRoute(path: '/roadmap', builder: (_, __) => const RoadmapScreen()),
+      GoRoute(
+        path: '/roadmap',
+        builder: (context, state) => const RoadmapScreen(),
+      ),
       ShellRoute(
         builder: (_, _, child) => MainShell(child: child),
         routes: [
@@ -52,6 +57,16 @@ GoRouter createRouter(BuildContext context) {
           GoRoute(
             path: '/community',
             builder: (_, _) => const CommunityScreen(),
+          ),
+          GoRoute(
+            path: '/community/post/:postId',
+            builder: (context, state) => ForumPostDetailScreen(
+              postId: state.pathParameters['postId'] ?? '',
+            ),
+          ),
+          GoRoute(
+            path: '/community/admin',
+            builder: (context, state) => const AdminReviewScreen(),
           ),
           GoRoute(path: '/camera', builder: (_, _) => const CameraScreen()),
           GoRoute(path: '/profile', builder: (_, _) => const ProfileScreen()),
