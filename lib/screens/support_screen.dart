@@ -45,7 +45,6 @@ class SupportScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // ── UI TEAM: Style search bar ──
             TextField(
               decoration: InputDecoration(
                 hintText: 'Search topics, FAQs, experts...',
@@ -151,7 +150,7 @@ class SupportScreen extends StatelessWidget {
                 ),
               ],
             ),
-            // ── UI TEAM: Replace with real agricultural center card ──
+
             Container(
               height: 120,
               decoration: BoxDecoration(
@@ -182,24 +181,40 @@ class SupportScreen extends StatelessWidget {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-            // ── UI TEAM: Style FAQ accordion ──
+
             ...[
-              'How accurate is the disease detection?',
-              'Is my farm data shared with others?',
-              'What if the scanner doesn\'t recognize a spot?',
+              (
+                'How accurate is the disease detection?',
+                'Our AI-powered detection system can identify common plant diseases with high accuracy when the image is clear and well lit. For best results, scan the affected leaf in natural light and keep the camera steady.',
+              ),
+              (
+                'Is my farm data shared with others?',
+                'No. Your farm data is kept private and is not shared with other users or third parties without your permission. We use secure storage methods to protect your information.',
+              ),
+              (
+                'What if the scanner doesn\'t recognize a spot?',
+                'If the scanner cannot recognize a spot, try taking another photo from a closer angle with better lighting. If the issue continues, you can use Expert Consultation or Technical Support for further help.',
+              ),
             ].map(
-              (q) => Container(
+              (item) => Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: ExpansionTile(
-                  title: Text(q, style: const TextStyle(fontSize: 14)),
-                  children: const [
+                  title: Text(item.$1, style: const TextStyle(fontSize: 14)),
+                  children: [
                     Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Text('Answer content here — UI team to fill in.'),
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        item.$2,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.black87,
+                          height: 1.5,
+                        ),
+                      ),
                     ),
                   ],
                 ),

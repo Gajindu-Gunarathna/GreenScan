@@ -1,139 +1,303 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import '../utils/app_colors.dart';
-import '../providers/auth_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
+import '../providers/auth_provider.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Access the current user data from AuthProvider
     final user = context.watch<AuthProvider>().currentUser;
+
+    final tiles = [
+      (Icons.person_outline_rounded, 'Name', user?.name ?? 'Not set'),
+      (Icons.phone_outlined, 'Phone', user?.phone ?? 'Not set'),
+      (Icons.email_outlined, 'Email', user?.email ?? 'Not set'),
+      (Icons.home_outlined, 'Address', user?.address ?? 'Not set'),
+      (Icons.location_city_outlined, 'City', user?.city ?? 'Not set'),
+      (Icons.map_outlined, 'District', user?.district ?? 'Not set'),
+    ];
+
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: const Color(0xFFF2F6F4),
+      // FIXED: Changed 'app' to 'appBar'
       appBar: AppBar(
         backgroundColor: Colors.white,
-        elevation: 0.5,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        centerTitle: false,
+        titleSpacing: 16,
         title: Row(
           children: [
             Container(
-              width: 28,
-              height: 28,
+              width: 34,
+              height: 34,
               decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(6),
+                color: const Color(0xFF0E6B43),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.eco, color: Colors.white, size: 18),
+              child: const Icon(
+                Icons.eco_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             const Text(
               'GreenScan',
               style: TextStyle(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.bold,
+                color: Color(0xFF1F2D2A),
+                fontWeight: FontWeight.w800,
+                fontSize: 19,
+                letterSpacing: -0.2,
               ),
             ),
           ],
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            const SizedBox(height: 16),
-            // ── UI TEAM: Replace with profile image upload widget ──
-            Stack(
-              children: [
-                CircleAvatar(
-                  radius: 50,
-                  backgroundColor: AppColors.primaryLight.withOpacity(0.2),
-                  child: const Icon(
-                    Icons.person,
-                    size: 60,
-                    color: AppColors.textSecondary,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 430),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: Column(
+                children: [
+                  const SizedBox(height: 10),
+
+                  // Avatar section
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: const Color(0xFFB6D9C4),
+                            width: 2.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF0E6B43).withOpacity(0.12),
+                              blurRadius: 22,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
+                        ),
+                        child: CircleAvatar(
+                          radius: 54,
+                          backgroundColor: const Color(0xFFB9DCC8),
+                          // FIXED: Added null assertions (!) where the compiler couldn't track promotion
+                          backgroundImage:
+                              (user?.profileImageUrl != null &&
+                                  user!.profileImageUrl!.isNotEmpty)
+                              ? NetworkImage(user.profileImageUrl!)
+                              : null,
+                          child:
+                              (user?.profileImageUrl == null ||
+                                  user!.profileImageUrl!.isEmpty)
+                              ? const Icon(
+                                  Icons.person,
+                                  size: 58,
+                                  color: Colors.black87,
+                                )
+                              : null,
+                        ),
+                      ),
+                      Positioned(
+                        right: 4,
+                        bottom: 2,
+                        child: Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0E6B43),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.12),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.camera_alt_rounded,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
+
+                  const SizedBox(height: 18),
+
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 7,
+                    ),
                     decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
+                      color: const Color(0xFF0E6B43),
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF0E6B43).withOpacity(0.18),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    child: const Icon(
-                      Icons.camera_alt,
-                      color: Colors.white,
-                      size: 16,
+                    child: const Text(
+                      'Add Profile',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.2,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            TextButton(onPressed: () {}, child: const Text('Add Profile')),
-            const SizedBox(height: 20),
 
-            // ── UI TEAM: Style info tiles to match Figma ──
-            ...[
-              (user?.name ?? 'No name', Icons.person_outline),
-              (user?.phone ?? 'No phone', Icons.phone_outlined),
-              (user?.email ?? 'No email', Icons.email_outlined),
-              (user?.address ?? 'No address', Icons.location_on_outlined),
-              (user?.city ?? 'No city', Icons.location_city_outlined),
-              (user?.district ?? 'No district', Icons.map_outlined),
-            ].map(
-              (item) => Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryLight.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                child: Row(
-                  children: [
-                    Icon(item.$2, color: AppColors.primary, size: 20),
-                    const SizedBox(width: 12),
-                    Text(item.$1),
-                  ],
-                ),
-              ),
-            ),
+                  const SizedBox(height: 28),
 
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {},
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 40,
-                  vertical: 14,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30),
-                ),
+                  // Info tiles
+                  ...tiles.map((tile) {
+                    final icon = tile.$1;
+                    final label = tile.$2;
+                    final value = tile.$3;
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 16,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFAED2BC),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: const Color(0xFF98C5AB),
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.35),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Icon(
+                                icon,
+                                color: const Color(0xFF0E6B43),
+                                size: 21,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    label,
+                                    style: TextStyle(
+                                      color: const Color(
+                                        0xFF1F2D2A,
+                                      ).withOpacity(0.55),
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    value,
+                                    style: const TextStyle(
+                                      color: Color(0xFF15211E),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.1,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+
+                  const SizedBox(height: 12),
+
+                  // Edit button
+                  SizedBox(
+                    width: 170,
+                    child: ElevatedButton(
+                      onPressed: () {},
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0E6B43),
+                        foregroundColor: Colors.white,
+                        elevation: 4,
+                        shadowColor: const Color(0xFF0E6B43).withOpacity(0.3),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                      child: const Text(
+                        'Edit Details',
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  // Logout link
+                  GestureDetector(
+                    onTap: () async {
+                      await context.read<AuthProvider>().logout();
+                      if (context.mounted) {
+                        context.go('/login');
+                      }
+                    },
+                    child: Text(
+                      'Logout',
+                      style: TextStyle(
+                        color: Colors.redAccent.shade200,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        decoration: TextDecoration.underline,
+                        decorationColor: Colors.redAccent.shade200,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 40),
+                ],
               ),
-              child: const Text('Edit Details'),
             ),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: () async {
-                await context.read<AuthProvider>().logout();
-                if (context.mounted) context.go('/login');
-              },
-              child: const Text(
-                'Logout',
-                style: TextStyle(color: AppColors.error),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
