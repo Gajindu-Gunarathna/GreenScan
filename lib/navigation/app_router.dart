@@ -18,6 +18,7 @@ import '../screens/hotlines_screen.dart';
 import '../screens/roadmap_screen.dart';
 import '../screens/forum_post_detail_screen.dart';
 import '../screens/admin_review_screen.dart';
+import '../screens/forgot_password_screen.dart';
 
 GoRouter createRouter(BuildContext context) {
   return GoRouter(
@@ -43,6 +44,10 @@ GoRouter createRouter(BuildContext context) {
       GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingScreen()),
       GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
       GoRoute(path: '/register', builder: (_, _) => const RegisterScreen()),
+      GoRoute(
+        path: '/forgot-password',
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
       GoRoute(path: '/result', builder: (_, _) => const ResultScreen()),
       GoRoute(path: '/treatment', builder: (_, _) => const TreatmentScreen()),
       GoRoute(path: '/hotlines', builder: (_, _) => const HotlinesScreen()),

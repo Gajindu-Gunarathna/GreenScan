@@ -258,7 +258,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: GestureDetector(
-                      onTap: isLoading ? null : _forgotPassword,
+                      onTap: isLoading
+                          ? null
+                          : () => context.go('/forgot-password'),
                       child: const Text(
                         'Forgot Password?',
                         style: TextStyle(
@@ -330,7 +332,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 30),
 
-                  // Register / Admin links
+                  // Register link section
                   Text(
                     "Don't have an account?",
                     style: TextStyle(
@@ -340,39 +342,19 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      GestureDetector(
-                        onTap: () => context.go('/register'),
-                        child: const Text(
-                          'Register',
-                          style: TextStyle(
-                            color: Color(0xFF2E8B57),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                  /* MODIFICATION: Removed the Row and the 'Admin' link. 
+                     The 'Register' link is now a standalone GestureDetector to keep it centered.
+                  */
+                  GestureDetector(
+                    onTap: () => context.go('/register'),
+                    child: const Text(
+                      'Register',
+                      style: TextStyle(
+                        color: Color(0xFF2E8B57),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
                       ),
-                      Text(
-                        ' | ',
-                        style: TextStyle(
-                          color: const Color(0xFF1C2B2B).withOpacity(0.3),
-                          fontSize: 14,
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () => context.go('/home'),
-                        child: const Text(
-                          'Admin',
-                          style: TextStyle(
-                            color: Color(0xFF2E8B57),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
 
                   const SizedBox(height: 40),

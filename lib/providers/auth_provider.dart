@@ -126,6 +126,53 @@ class AuthProvider extends ChangeNotifier {
     await _authService.sendPasswordResetEmail(email);
   }
 
+  Future<bool> updateProfile({
+    required String name,
+    required String phone,
+    required String address,
+    required String city,
+    required String district,
+    String? profileImageUrl,
+  }) async {
+    if (_currentUser == null) return false;
+
+    _state = AuthState.loading;
+    _errorMessage = '';
+    notifyListeners();
+
+    try {
+      _currentUser = await _authService.updateProfile(
+        userId: _currentUser!.id,
+        name: name,
+        phone: phone,
+        address: address,
+        city: city,
+        district: district,
+        profileImageUrl: profileImageUrl,
+      );
+
+      LocalStorageService.saveString(
+        AppConstants.userBox,
+        'district',
+        _currentUser!.district,
+      );
+      LocalStorageService.saveString(
+        AppConstants.userBox,
+        'userId',
+        _currentUser!.id,
+      );
+
+      _state = AuthState.authenticated;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      _state = AuthState.authenticated;
+      notifyListeners();
+      return false;
+    }
+  }
+
   void clearError() {
     _errorMessage = '';
     notifyListeners();

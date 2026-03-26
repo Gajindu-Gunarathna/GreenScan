@@ -102,6 +102,30 @@ class AuthService {
     return UserModel.fromMap(doc.data()!);
   }
 
+  Future<UserModel> updateProfile({
+    required String userId,
+    required String name,
+    required String phone,
+    required String address,
+    required String city,
+    required String district,
+    String? profileImageUrl,
+  }) async {
+    await _db.collection('users').doc(userId).update({
+      'name': name.trim(),
+      'phone': phone.trim(),
+      'address': address.trim(),
+      'city': city.trim(),
+      'district': district.trim(),
+      'profileImageUrl': (profileImageUrl ?? '').trim().isEmpty
+          ? null
+          : profileImageUrl!.trim(),
+    });
+
+    final updated = await _db.collection('users').doc(userId).get();
+    return UserModel.fromMap(updated.data()!);
+  }
+
   // ── Convert Firebase errors to readable messages ─────────────
   String _handleAuthError(FirebaseAuthException e) {
     switch (e.code) {

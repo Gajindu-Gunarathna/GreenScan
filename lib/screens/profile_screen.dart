@@ -1,303 +1,435 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:go_router/go_router.dart';
-import '../providers/auth_provider.dart';
+import 'dart:io';
 
-class ProfileScreen extends StatelessWidget {
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
+import '../services/cloudinary_service.dart';
+import '../utils/app_colors.dart';
+
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final user = context.watch<AuthProvider>().currentUser;
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
 
-    final tiles = [
-      (Icons.person_outline_rounded, 'Name', user?.name ?? 'Not set'),
-      (Icons.phone_outlined, 'Phone', user?.phone ?? 'Not set'),
-      (Icons.email_outlined, 'Email', user?.email ?? 'Not set'),
-      (Icons.home_outlined, 'Address', user?.address ?? 'Not set'),
-      (Icons.location_city_outlined, 'City', user?.city ?? 'Not set'),
-      (Icons.map_outlined, 'District', user?.district ?? 'Not set'),
-    ];
+class _ProfileScreenState extends State<ProfileScreen> {
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _districtController = TextEditingController();
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF2F6F4),
-      // FIXED: Changed 'app' to 'appBar'
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        centerTitle: false,
-        titleSpacing: 16,
-        title: Row(
+  bool _isEditing = false;
+  bool _isSaving = false;
+  bool _isUploadingImage = false;
+
+  File? _pickedImage;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _addressController.dispose();
+    _cityController.dispose();
+    _districtController.dispose();
+    super.dispose();
+  }
+
+  void _sync(AuthProvider auth) {
+    final user = auth.currentUser;
+    if (user == null) return;
+    _nameController.text = user.name;
+    _phoneController.text = user.phone;
+    _addressController.text = user.address;
+    _cityController.text = user.city;
+    _districtController.text = user.district;
+  }
+
+  Future<void> _pickImage() async {
+    final source = await _showImageSourceDialog();
+    if (source == null) return;
+
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: source,
+      imageQuality: 75,
+      maxWidth: 800,
+    );
+    if (picked == null) return;
+
+    setState(() => _pickedImage = File(picked.path));
+  }
+
+  Future<ImageSource?> _showImageSourceDialog() {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
+            const SizedBox(height: 8),
             Container(
-              width: 34,
-              height: 34,
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
-                color: const Color(0xFF0E6B43),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.eco_rounded,
-                color: Colors.white,
-                size: 20,
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(width: 10),
-            const Text(
-              'GreenScan',
-              style: TextStyle(
-                color: Color(0xFF1F2D2A),
-                fontWeight: FontWeight.w800,
-                fontSize: 19,
-                letterSpacing: -0.2,
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Take a photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Upload picked image to Cloudinary and return the secure URL.
+  Future<String?> _uploadImage() async {
+    if (_pickedImage == null) return null;
+
+    setState(() => _isUploadingImage = true);
+    try {
+      final url = await CloudinaryService().uploadProfileImage(
+        _pickedImage!.path,
+      );
+      return url;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Image upload failed: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return null;
+    } finally {
+      if (mounted) setState(() => _isUploadingImage = false);
+    }
+  }
+
+  // ── logg out hander ────────────────────────────────────────────────
+  Future<void> _handleLogout(AuthProvider auth) async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Do you want to log out now?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldLogout == true) {
+      await auth.logout();
+      if (mounted) context.go('/login');
+    }
+  }
+
+  Future<void> _save(AuthProvider auth) async {
+    setState(() => _isSaving = true);
+
+    String? newImageUrl;
+    if (_pickedImage != null) {
+      newImageUrl = await _uploadImage();
+      if (newImageUrl == null) {
+        // Upload failed — error already shown, abort save
+        setState(() => _isSaving = false);
+        return;
+      }
+    }
+
+    final ok = await auth.updateProfile(
+      name: _nameController.text.trim(),
+      phone: _phoneController.text.trim(),
+      address: _addressController.text.trim(),
+      city: _cityController.text.trim(),
+      district: _districtController.text.trim(),
+      profileImageUrl: newImageUrl ?? auth.currentUser?.profileImageUrl ?? '',
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _isSaving = false;
+      if (ok) {
+        _isEditing = false;
+        _pickedImage = null;
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok ? 'Profile updated.' : auth.errorMessage),
+        backgroundColor: ok ? AppColors.success : AppColors.error,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final user = auth.currentUser;
+
+    if (user != null && _nameController.text.isEmpty) {
+      _sync(auth);
+    }
+
+    final networkUrl = user?.profileImageUrl ?? '';
+    final bool busy = _isSaving || _isUploadingImage;
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0.5,
+        title: const Text(
+          'Profile',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            const SizedBox(height: 8),
+
+            // ── Avatar with optional camera button ───────────────────────
+            Stack(
+              alignment: Alignment.bottomRight,
+              children: [
+                CircleAvatar(
+                  radius: 52,
+                  backgroundColor: AppColors.primaryLight.withAlpha(40),
+                  backgroundImage: _pickedImage != null
+                      ? FileImage(_pickedImage!) as ImageProvider
+                      : networkUrl.isNotEmpty
+                      ? NetworkImage(networkUrl)
+                      : null,
+                  child: (_pickedImage == null && networkUrl.isEmpty)
+                      ? const Icon(
+                          Icons.person,
+                          size: 54,
+                          color: AppColors.textSecondary,
+                        )
+                      : null,
+                ),
+                if (_isEditing)
+                  GestureDetector(
+                    onTap: busy ? null : _pickImage,
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: _isUploadingImage
+                          ? const Padding(
+                              padding: EdgeInsets.all(7),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.camera_alt,
+                              size: 18,
+                              color: Colors.white,
+                            ),
+                    ),
+                  ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // ── Fields ───────────────────────────────────────────────────
+            _profileInput(
+              icon: Icons.person_outline,
+              label: 'Name',
+              controller: _nameController,
+              enabled: _isEditing,
+            ),
+            _profileInput(
+              icon: Icons.phone_outlined,
+              label: 'Phone',
+              controller: _phoneController,
+              enabled: _isEditing,
+            ),
+            _readonlyField(
+              icon: Icons.email_outlined,
+              label: 'Email',
+              value: user?.email ?? '',
+            ),
+            _profileInput(
+              icon: Icons.home_outlined,
+              label: 'Address',
+              controller: _addressController,
+              enabled: _isEditing,
+            ),
+            _profileInput(
+              icon: Icons.location_city_outlined,
+              label: 'City',
+              controller: _cityController,
+              enabled: _isEditing,
+            ),
+            _profileInput(
+              icon: Icons.map_outlined,
+              label: 'District',
+              controller: _districtController,
+              enabled: _isEditing,
+            ),
+
+            const SizedBox(height: 16),
+
+            // ── Buttons ──────────────────────────────────────────────────
+            if (_isEditing)
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: busy
+                          ? null
+                          : () {
+                              setState(() {
+                                _isEditing = false;
+                                _pickedImage = null;
+                              });
+                              _sync(auth);
+                            },
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: busy ? null : () => _save(auth),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: busy
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('Save'),
+                    ),
+                  ),
+                ],
+              )
+            else
+              ElevatedButton(
+                onPressed: () => setState(() => _isEditing = true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Edit Details'),
+              ),
+
+            const SizedBox(height: 8),
+
+            // ──LOGOUT BUTTON HERE ──────────────────────────────────
+            TextButton(
+              onPressed: () =>
+                  _handleLogout(auth), // Called the new dialog method
+              child: const Text(
+                'Logout',
+                style: TextStyle(color: AppColors.error),
               ),
             ),
           ],
         ),
       ),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 430),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              child: Column(
-                children: [
-                  const SizedBox(height: 10),
+    );
+  }
 
-                  // Avatar section
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(5),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: const Color(0xFFB6D9C4),
-                            width: 2.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF0E6B43).withOpacity(0.12),
-                              blurRadius: 22,
-                              offset: const Offset(0, 10),
-                            ),
-                          ],
-                        ),
-                        child: CircleAvatar(
-                          radius: 54,
-                          backgroundColor: const Color(0xFFB9DCC8),
-                          // FIXED: Added null assertions (!) where the compiler couldn't track promotion
-                          backgroundImage:
-                              (user?.profileImageUrl != null &&
-                                  user!.profileImageUrl!.isNotEmpty)
-                              ? NetworkImage(user.profileImageUrl!)
-                              : null,
-                          child:
-                              (user?.profileImageUrl == null ||
-                                  user!.profileImageUrl!.isEmpty)
-                              ? const Icon(
-                                  Icons.person,
-                                  size: 58,
-                                  color: Colors.black87,
-                                )
-                              : null,
-                        ),
-                      ),
-                      Positioned(
-                        right: 4,
-                        bottom: 2,
-                        child: Container(
-                          width: 34,
-                          height: 34,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0E6B43),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 3),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.12),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.camera_alt_rounded,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+  Widget _profileInput({
+    required IconData icon,
+    required String label,
+    required TextEditingController controller,
+    required bool enabled,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TextField(
+        controller: controller,
+        enabled: enabled,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon, color: AppColors.primary),
+          filled: true,
+          fillColor: enabled ? Colors.white : Colors.grey.shade100,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+    );
+  }
 
-                  const SizedBox(height: 18),
-
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 7,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0E6B43),
-                      borderRadius: BorderRadius.circular(30),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF0E6B43).withOpacity(0.18),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const Text(
-                      'Add Profile',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 28),
-
-                  // Info tiles
-                  ...tiles.map((tile) {
-                    final icon = tile.$1;
-                    final label = tile.$2;
-                    final value = tile.$3;
-
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 16,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFAED2BC),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: const Color(0xFF98C5AB),
-                            width: 1,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 42,
-                              height: 42,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.35),
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: Icon(
-                                icon,
-                                color: const Color(0xFF0E6B43),
-                                size: 21,
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    label,
-                                    style: TextStyle(
-                                      color: const Color(
-                                        0xFF1F2D2A,
-                                      ).withOpacity(0.55),
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    value,
-                                    style: const TextStyle(
-                                      color: Color(0xFF15211E),
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      letterSpacing: 0.1,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }),
-
-                  const SizedBox(height: 12),
-
-                  // Edit button
-                  SizedBox(
-                    width: 170,
-                    child: ElevatedButton(
-                      onPressed: () {},
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0E6B43),
-                        foregroundColor: Colors.white,
-                        elevation: 4,
-                        shadowColor: const Color(0xFF0E6B43).withOpacity(0.3),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                      ),
-                      child: const Text(
-                        'Edit Details',
-                        style: TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  // Logout link
-                  GestureDetector(
-                    onTap: () async {
-                      await context.read<AuthProvider>().logout();
-                      if (context.mounted) {
-                        context.go('/login');
-                      }
-                    },
-                    child: Text(
-                      'Logout',
-                      style: TextStyle(
-                        color: Colors.redAccent.shade200,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        decoration: TextDecoration.underline,
-                        decorationColor: Colors.redAccent.shade200,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 40),
-                ],
+  Widget _readonlyField({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                '$label: $value',
+                style: const TextStyle(color: AppColors.textPrimary),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );

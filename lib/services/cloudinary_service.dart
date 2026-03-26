@@ -6,17 +6,25 @@ import '../utils/secrets.dart';
 class CloudinaryService {
   static const String _baseUrl = 'https://api.cloudinary.com/v1_1';
 
+  /// Upload a betel leaf scan image — stored in greenscan_leaves/
   Future<String> uploadLeafImage(String imagePath) async {
+    return _upload(imagePath, folder: 'greenscan_leaves');
+  }
+
+  /// Upload a user profile photo — stored in greenscan_profiles/
+  Future<String> uploadProfileImage(String imagePath) async {
+    return _upload(imagePath, folder: 'greenscan_profiles');
+  }
+
+  Future<String> _upload(String imagePath, {required String folder}) async {
     try {
       final uri = Uri.parse(
         '$_baseUrl/${Secrets.cloudinaryCloudName}/image/upload',
       );
 
       final request = http.MultipartRequest('POST', uri);
-
       request.fields['upload_preset'] = Secrets.cloudinaryUploadPreset;
-      request.fields['folder'] = 'greenscan_leaves';
-
+      request.fields['folder'] = folder;
       request.files.add(await http.MultipartFile.fromPath('file', imagePath));
 
       final response = await request.send();

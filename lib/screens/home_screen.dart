@@ -3,7 +3,9 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../providers/active_plan_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/map_provider.dart';
 import '../providers/notification_provider.dart';
+import '../services/connectivity_service.dart';
 import '../services/local_storage_service.dart';
 import '../utils/app_constants.dart';
 import '../utils/app_colors.dart';
@@ -22,11 +24,16 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final auth = context.read<AuthProvider>();
       final planProvider = context.read<ActivePlanProvider>();
+      final mapProvider = context.read<MapProvider>();
+      final connectivity = context.read<ConnectivityService>();
       final userId = auth.currentUser?.id ?? 'temp_user_id';
       final district = auth.currentUser?.district ?? 'Colombo';
+      final isOnline = await connectivity.isOnline();
 
       await planProvider.loadActivePlan(userId);
       await planProvider.loadDistrictAlert(district);
+      await mapProvider.loadDistrictData(isOnline: isOnline);
+      await context.read<NotificationProvider>().loadNotifications(userId);
       if (mounted) {
         await _triggerSmartNotifications(
           userId: userId,
@@ -41,6 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final planProvider = context.watch<ActivePlanProvider>();
     final authProvider = context.watch<AuthProvider>();
     final notificationProvider = context.watch<NotificationProvider>();
+    final mapProvider = context.watch<MapProvider>();
     final userId = authProvider.currentUser?.id ?? 'temp_user_id';
     final userName = authProvider.currentUser?.name ?? 'Farmer';
 
@@ -148,6 +156,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 20),
               _buildAnalysisOverview(
                 planProvider: planProvider,
+                mapProvider: mapProvider,
                 district: authProvider.currentUser?.district ?? 'Colombo',
               ),
               const SizedBox(height: 16),
@@ -171,10 +180,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildAnalysisOverview({
     required ActivePlanProvider planProvider,
+    required MapProvider mapProvider,
     required String district,
   }) {
     final plan = planProvider.activePlan;
     final alert = planProvider.districtAlert;
+    final allDistricts = mapProvider.districts;
+    final topDistrict = allDistricts.isNotEmpty ? allDistricts.first : null;
+    final totalCasesCountry = allDistricts.fold<int>(
+      0,
+      (sum, d) => sum + d.totalCases,
+    );
+    final activeDistricts = allDistricts.where((d) => d.totalCases > 0).length;
     final int caseCount = (alert?['totalCases'] ?? 0) as int;
     final String risk = _riskLabel(caseCount);
     final Color riskColor = _riskColor(caseCount);
@@ -244,25 +261,47 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Expanded(
                 child: _metricTile(
-                  title: 'Pending Actions',
-                  value: '$pendingSteps',
-                  hint: pendingSteps == 0 ? 'All clear' : 'Steps to complete',
-                  valueColor: pendingSteps == 0 ? AppColors.success : AppColors.warning,
-                  icon: Icons.task_alt_outlined,
+                  title: 'Top Disease (Country)',
+                  value: topDistrict?.mostCommonDisease.isNotEmpty == true
+                      ? topDistrict!.mostCommonDisease
+                      : 'No data yet',
+                  hint: topDistrict == null
+                      ? 'Waiting for scan data'
+                      : '${topDistrict.totalCases} cases in ${topDistrict.district}',
+                  valueColor: AppColors.textPrimary,
+                  icon: Icons.analytics_outlined,
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: _metricTile(
-                  title: 'Detected Disease',
-                  value: plan?.diseaseName ?? 'Not scanned',
-                  hint: plan == null ? 'Scan to detect' : 'Current active case',
-                  valueColor: AppColors.textPrimary,
-                  icon: Icons.biotech_outlined,
+                  title: 'National Scan Stats',
+                  value: totalCasesCountry == 0
+                      ? 'No cases yet'
+                      : '$totalCasesCountry total',
+                  hint: activeDistricts == 0
+                      ? 'No affected districts'
+                      : '$activeDistricts districts reporting',
+                  valueColor: totalCasesCountry == 0
+                      ? AppColors.textSecondary
+                      : AppColors.primary,
+                  icon: Icons.public_outlined,
                 ),
               ),
             ],
           ),
+          if (plan != null) ...[
+            const SizedBox(height: 10),
+            _metricTile(
+              title: 'Pending Actions',
+              value: '$pendingSteps',
+              hint: pendingSteps == 0 ? 'All clear' : 'Steps to complete',
+              valueColor: pendingSteps == 0
+                  ? AppColors.success
+                  : AppColors.warning,
+              icon: Icons.task_alt_outlined,
+            ),
+          ],
         ],
       ),
     );
@@ -580,9 +619,12 @@ class _HomeScreenState extends State<HomeScreen> {
         'last_alert_$userId',
       );
       if (last != signature) {
-        notificationProvider.addNotification(
-          'District Alert',
-          '${alert['diseaseName']} is increasing in ${alert['district']} (${alert['totalCases']} cases).',
+        await notificationProvider.addNotificationForUser(
+          userId: userId,
+          title: 'District Alert',
+          body:
+              '${alert['diseaseName']} is increasing in ${alert['district']} (${alert['totalCases']} cases).',
+          type: 'district_alert',
         );
         await LocalStorageService.saveString(
           AppConstants.userBox,
@@ -602,9 +644,12 @@ class _HomeScreenState extends State<HomeScreen> {
           'last_plan_reminder_$userId',
         );
         if (lastReminder != reminderKey) {
-          notificationProvider.addNotification(
-            'Treatment Reminder',
-            'You still have $pending pending step${pending > 1 ? 's' : ''} in your treatment plan.',
+          await notificationProvider.addNotificationForUser(
+            userId: userId,
+            title: 'Treatment Reminder',
+            body:
+                'You still have $pending pending step${pending > 1 ? 's' : ''} in your treatment plan.',
+            type: 'plan_reminder',
           );
           await LocalStorageService.saveString(
             AppConstants.userBox,
@@ -621,9 +666,11 @@ class _HomeScreenState extends State<HomeScreen> {
         'last_completed_plan_$userId',
       );
       if (lastCompleted != plan.id) {
-        notificationProvider.addNotification(
-          'Plan Completed',
-          'Great job! You completed your ${plan.diseaseName} treatment plan.',
+        await notificationProvider.addNotificationForUser(
+          userId: userId,
+          title: 'Plan Completed',
+          body: 'Great job! You completed your ${plan.diseaseName} treatment plan.',
+          type: 'plan_complete',
         );
         await LocalStorageService.saveString(
           AppConstants.userBox,
@@ -635,9 +682,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showNotifications(BuildContext context) {
+    final userId = context.read<AuthProvider>().currentUser?.id ?? 'temp_user_id';
     final notificationProvider = context.read<NotificationProvider>();
     final items = List<Map<String, dynamic>>.from(notificationProvider.notifications);
-    notificationProvider.markAllRead();
+    notificationProvider.markAllReadForUser(userId);
 
     showModalBottomSheet(
       context: context,

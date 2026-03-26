@@ -2,11 +2,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import '../models/forum_post_model.dart';
 import 'ai_service.dart';
+import 'notification_service.dart';
 
 class ForumService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final _uuid = const Uuid();
   final AiService _ai = AiService();
+  final NotificationService _notificationService = NotificationService();
 
   Future<List<ForumPostModel>> getPostsFeed() async {
     final snapshot = await _db
@@ -112,6 +114,9 @@ class ForumService {
     required String userName,
     required String content,
   }) async {
+    final postDoc = await _db.collection('forum_posts').doc(postId).get();
+    final post = ForumPostModel.fromMap(postDoc.data()!);
+
     final reply = ForumReply(
       id: _uuid.v4(),
       userId: userId,
@@ -124,6 +129,17 @@ class ForumService {
     await _db.collection('forum_posts').doc(postId).update({
       'replies': FieldValue.arrayUnion([reply.toMap()]),
     });
+
+    if (post.userId != userId) {
+      await _notificationService.createUserNotification(
+        userId: post.userId,
+        title: 'New comment on your post',
+        body: '$userName replied: ${content.trim()}',
+        type: 'post_comment',
+        postId: postId,
+        actorUserId: userId,
+      );
+    }
 
     final doc = await _db.collection('forum_posts').doc(postId).get();
     return ForumPostModel.fromMap(doc.data()!);
